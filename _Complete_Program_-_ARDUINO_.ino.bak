@@ -90,7 +90,8 @@ void loop() {
     analogWrite(rpsout, 0); //send pwm data to labjack 
   }
   Serial.print("  ");
-  Serial.println(rpm);
+  Serial.println(rpm);  
+
 }
 
 float getrpm( int b, float rpmlast ) {
