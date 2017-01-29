@@ -10,6 +10,7 @@ int remainingByte = 0;
 typedef unsigned char uchar;
 uchar signal = 4; //RPM Sensor on pin 4
 uchar rpsout = 11; //Data out to labjack
+uchar throut = 3; //Data out to labjack
 
 void setup() {
   Serial.begin(9600); // Opening communication
@@ -17,9 +18,10 @@ void setup() {
   Serial.println("Warning: Do not connect power supply.");
   pinMode(signal, INPUT); //RPM Sensor pin
   pinMode(rpsout, OUTPUT);   // sets the pin as output
-
+  pinMode(throut, OUTPUT);  
+  
   /* Initial Motor Setup */
-  m1.attach(9); // ESC/Motor attatched to pin 6
+  m1.attach(9); // ESC/Motor attatched to pin 9
   throttle = 0.0;
   microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0))+0.50); //round to int
   m1.writeMicroseconds(microseconds);
@@ -63,6 +65,8 @@ void loop() {
   Serial.print("  ");
   Serial.print(throttle); // Only read with a serial input given
   Serial.print("  ");
+  analogWrite(throut, int(throttle*2.54)+0.5); //send throttle data to labjack 
+  
   if (Serial.available() > 0) {
      throttle = Serial.parseFloat(); //read float
      while(Serial.available() > 0) {        
