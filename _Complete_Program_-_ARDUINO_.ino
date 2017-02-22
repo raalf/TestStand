@@ -4,6 +4,8 @@
 Servo m1; // Identifying ESC/Motor
 int microseconds;
 int b; //number of blades
+char inData[20]; // Allocate some space for the string
+char inChar = -1; // Where to store the character read
 byte index = 0; // Index into array, for imcoming serial command
 float throttle = 0.0;
 float prev_throttle = 0.0;
@@ -67,42 +69,61 @@ void loop() {
   Serial.print("  ");
   Serial.print(throttle); // Only read with a serial input given
   Serial.print("  ");
+  Serial.print(microseconds);
+  Serial.print("  ");
   analogWrite(throut, int(throttle * 2.54) + 0.5); //send throttle data to labjack
 
   if (Serial.available() > 0) { // SERIAL EVENT
 
     prev_throttle = throttle; // store throttle setting from prev. instance
-    
-    throttle = Serial.parseFloat(); //read float
+
+    //    throttle = Serial.parseFloat(); //read float
 
 
     while (Serial.available() > 0) { // Don't read unless
+      Serial.print("while loop\n");
       if (index < 19) // One less than the size of the array
       {
         inChar = Serial.read(); // Read a character
+        if (inChar == '\n' || inChar == '\r') {
+          break;
+        }
         inData[index] = inChar; // Store it
         index++; // Increment where to write next
         inData[index] = '\0'; // Null terminate the string
       }
     }
+    Serial.print(inData);
 
+    // Process inData
 
     if (strcmp(inData, "h")  == 0) { //PID EVENT
-      Serial.write("HOLD!\n");
+      Serial.print("HOLD!\n");
     }
     else { //THROTTLE EVENT
-      if (strcmp(inData, ".")  == 0) {
+      if (strcmp(inData, "0")  == 0) {
+        throttle = 0;
+      }
+      else if (strcmp(inData, ".")  == 0) {
         throttle = prev_throttle + 1;
       }
-      if (strcmp(inData, ",")  == 0) {
+      else if (strcmp(inData, ",")  == 0) {
         throttle = prev_throttle - 1;
       }
-      if (strcmp(inData, ">")  == 0) {
+      else if (strcmp(inData, ">")  == 0) {
         throttle = prev_throttle + 0.1;
       }
-      if (strcmp(inData, "<")  == 0) {
+      else if (strcmp(inData, "<")  == 0) {
         throttle = prev_throttle - 0.1;
       }
+      else if (String(inData).toFloat() != 0) {
+        throttle = String(inData).toFloat();
+      }
+      else {
+        throttle = prev_throttle;
+      }
+
+
 
       //Error Test
       if (throttle < 0.0 || throttle > 100.0) {
@@ -116,7 +137,7 @@ void loop() {
       delay(100);
 
 
-    }
+    } // END THROTTLE EVENT
 
 
     for (int i = 0; i < 19; i++) {
