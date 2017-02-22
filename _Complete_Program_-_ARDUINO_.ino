@@ -4,7 +4,9 @@
 Servo m1; // Identifying ESC/Motor
 int microseconds;
 int b; //number of blades
-float throttle=0.0;
+byte index = 0; // Index into array, for imcoming serial command
+float throttle = 0.0;
+float prev_throttle = 0.0;
 float rpm;
 int remainingByte = 0;
 typedef unsigned char uchar;
@@ -18,12 +20,12 @@ void setup() {
   Serial.println("Warning: Do not connect power supply.");
   pinMode(signal, INPUT); //RPM Sensor pin
   pinMode(rpsout, OUTPUT);   // sets the pin as output
-  pinMode(throut, OUTPUT);  
-  
+  pinMode(throut, OUTPUT);
+
   /* Initial Motor Setup */
   m1.attach(9); // ESC/Motor attatched to pin 9
   throttle = 0.0;
-  microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0))+0.50); //round to int
+  microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0)) + 0.50); //round to int
   m1.writeMicroseconds(microseconds);
 
   delay(1000);
@@ -65,33 +67,79 @@ void loop() {
   Serial.print("  ");
   Serial.print(throttle); // Only read with a serial input given
   Serial.print("  ");
-  analogWrite(throut, int(throttle*2.54)+0.5); //send throttle data to labjack 
-  
-  if (Serial.available() > 0) {
-     throttle = Serial.parseFloat(); //read float
-     while(Serial.available() > 0) {        
-        remainingByte = (Serial.read()); //clear remaining values 
+  analogWrite(throut, int(throttle * 2.54) + 0.5); //send throttle data to labjack
+
+  if (Serial.available() > 0) { // SERIAL EVENT
+
+    prev_throttle = throttle; // store throttle setting from prev. instance
+    
+    throttle = Serial.parseFloat(); //read float
+
+
+    while (Serial.available() > 0) { // Don't read unless
+      if (index < 19) // One less than the size of the array
+      {
+        inChar = Serial.read(); // Read a character
+        inData[index] = inChar; // Store it
+        index++; // Increment where to write next
+        inData[index] = '\0'; // Null terminate the string
       }
-    //Error Test
-    if (throttle < 0.0 || throttle > 100.0) {
-      throttle = 0.0;
-      microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0))+0.50); //round to int
-      m1.writeMicroseconds(microseconds); // Motor will power down to 0%
     }
-    microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0))+0.50); //round to int
-    m1.writeMicroseconds(microseconds); // Will write to new throttle
-    delay(100);
-  }
+
+
+    if (strcmp(inData, "h")  == 0) { //PID EVENT
+      Serial.write("HOLD!\n");
+    }
+    else { //THROTTLE EVENT
+      if (strcmp(inData, ".")  == 0) {
+        throttle = prev_throttle + 1;
+      }
+      if (strcmp(inData, ",")  == 0) {
+        throttle = prev_throttle - 1;
+      }
+      if (strcmp(inData, ">")  == 0) {
+        throttle = prev_throttle + 0.1;
+      }
+      if (strcmp(inData, "<")  == 0) {
+        throttle = prev_throttle - 0.1;
+      }
+
+      //Error Test
+      if (throttle < 0.0 || throttle > 100.0) {
+        throttle = prev_throttle;
+        microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0)) + 0.50); //round to int
+        m1.writeMicroseconds(microseconds); // Motor will power down to 0%
+      }
+
+      microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0)) + 0.50); //round to int
+      m1.writeMicroseconds(microseconds); // Will write to new throttle
+      delay(100);
+
+
+    }
+
+
+    for (int i = 0; i < 19; i++) {
+      inData[i] = 0;
+    }
+    index = 0;
+
+
+
+  } // END OF SERIAL EVENT
+
+
+
   if (throttle > 9) {
     rpm = getrpm(b, rpm); //pass the last rpm
   }
   else {
     rpm = 0.00;
-    
+
     Serial.print(0.00); //rps
     Serial.print("  ");
-    
-    analogWrite(rpsout, 0); //send pwm data to labjack 
+
+    analogWrite(rpsout, 0); //send pwm data to labjack
   }
   Serial.print("  ");
   Serial.println(rpm);
@@ -153,7 +201,7 @@ float getrpm( int b, float rpmlast ) {
   time2 = micros() - 2000; // (!NOTE!..we subtract out the delay which was added after the last count++)
   //delay(50); //another small delay
   elapsedtime = time2 - time1;//get elapsed time for 360 deg revolution
-  
+
 
   //Serial.print(elapsedtime);
   //Serial.print(" ");
@@ -163,20 +211,20 @@ float getrpm( int b, float rpmlast ) {
 
   Serial.print(rps);
   Serial.print("  ");
- 
-  analogWrite(rpsout, int((rps*1.8)+0.5)); //send pwm data to labjack 
-  
+
+  analogWrite(rpsout, int((rps * 1.8) + 0.5)); //send pwm data to labjack
+
   rpmnew = rps * 60;
 
   //Serial.print(rpmnew);
   //Serial.print(" ");
 
   //smoothing equation rpm = (rpmlast*alpha) + (rpmnew *(1-alpha))
- 
+
   rpm = (rpmlast * 0.75) + (rpmnew * 0.25);
 
- 
-  
+
+
   //Serial.println(rpm);
 
   //elapsedtime = 0;
@@ -189,5 +237,5 @@ float getrpm( int b, float rpmlast ) {
 
 float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
 {
- return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
