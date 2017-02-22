@@ -1,6 +1,8 @@
 /* COMPLETE PROGRAM - Motor Control and RPM Indicator */
 
 #include <Servo.h>
+#include <PID_v1.h>
+
 Servo m1; // Identifying ESC/Motor
 int microseconds;
 int b; //number of blades
@@ -16,8 +18,18 @@ uchar signal = 4; //RPM Sensor on pin 4
 uchar rpsout = 11; //Data out to labjack
 uchar throut = 3; //Data out to labjack
 
+//Define PID Variables we'll be connecting to
+double Setpoint, Input, Output;
+//Define the aggressive and conservative Tuning Parameters
+double aggKp = 0.03, aggKi = 0.02, aggKd = 0.01 ; //close to target
+double consKp = 0.004, consKi = 0.01, consKd = 0.00; //far away from target
+
+//Specify the links and initial tuning parameters
+PID myPID(&Input, &Output, &Setpoint, consKp, consKi, consKd, DIRECT);
+
 void setup() {
   Serial.begin(9600); // Opening communication
+  myPID.SetMode(MANUAL);  //start with PID OFF
   Serial.println("COMPLETE PROGRAM - Motor Control and RPM Indicator");
   Serial.println("Warning: Do not connect power supply.");
   pinMode(signal, INPUT); //RPM Sensor pin
@@ -34,23 +46,22 @@ void setup() {
   Serial.println("\nPlease turn on the power supply.");
 
   while (Serial.available() == 0); // Waiting for 'blank' input
-  while (Serial.available() != 0) {
-    byte ch = Serial.read();
-  }
+  clearbuffer();
 
   Serial.println("Waiting to initialize...");
   Serial.println(" ");
   delay(1000);
 
-
   /* Number of Blades, b */
   Serial.println("Please enter the number of blades on the propeller 'b', Press ENTER:");
-  while (Serial.available() == 0) ;  // Wait until integer input
-  {
-    b = Serial.parseInt();
-    Serial.print("b = ");
-    Serial.println(b);
+  while (Serial.available() == 0) {
   }
+  // Wait until input
+  b = Serial.parseInt();
+  clearbuffer(); //clear serial buffer
+  Serial.print("b = ");
+  Serial.println(b);
+
   delay(1000);
   Serial.println("\nReady to Stream.");
   Serial.println("Enter a throttle percentage value at anytime.");
@@ -64,16 +75,15 @@ void setup() {
 
 void loop() {
 
-  /* Motor Control */
-  Serial.print(millis());
-  Serial.print("  ");
-  Serial.print(throttle); // Only read with a serial input given
-  Serial.print("  ");
-  Serial.print(microseconds);
-  Serial.print("  ");
+  //////////////////////////// PRINT DATA /////////////////////////////
+  Serial.print(millis()); //time since boot
+  Serial.print("\t");
+  Serial.print(throttle); //throttle position %
+  Serial.print("\t");
   analogWrite(throut, int(throttle * 2.54) + 0.5); //send throttle data to labjack
 
-  if (Serial.available() > 0) { // SERIAL EVENT
+  //////////////////////////// SERIAL INPUT EVENT /////////////////////
+  if (Serial.available() > 0) {
 
     prev_throttle = throttle; // store throttle setting from prev. instance
 
@@ -81,11 +91,12 @@ void loop() {
 
 
     while (Serial.available() > 0) { // Don't read unless
-      Serial.print("while loop\n");
+      
       if (index < 19) // One less than the size of the array
       {
         inChar = Serial.read(); // Read a character
         if (inChar == '\n' || inChar == '\r') {
+          clearbuffer();
           break;
         }
         inData[index] = inChar; // Store it
@@ -93,12 +104,69 @@ void loop() {
         inData[index] = '\0'; // Null terminate the string
       }
     }
-    Serial.print(inData);
+    clearbuffer();
 
-    // Process inData
 
     if (strcmp(inData, "h")  == 0) { //PID EVENT
-      Serial.print("HOLD!\n");
+
+      Setpoint = 3000; //setpoint is current rpm;
+      Serial.print("HOLD AT");
+      Serial.println(Setpoint);
+      Output = throttle;
+      myPID.SetMode(AUTOMATIC);  //turn the PID on
+      while (1 > 0) { //PID LOOP
+
+        Serial.print(millis());
+        Serial.print("\t");
+
+        Serial.print(throttle); // Only read with a serial input given
+        Serial.print("\t");
+        analogWrite(throut, int(throttle * 2.54) + 0.5); //send throttle data to labjack
+
+        Input = getrpm(b, rpm); //pass the last rpm
+        Serial.print(rpm);
+        Serial.print("\t");
+        
+        double gap = abs(Setpoint - Input); //distance away from setpoint
+
+        if (gap > 100)
+        { //we're far to setpoint
+          myPID.SetTunings(consKp, consKi, consKd);
+         Serial.print("PID Mode: Change") ;
+         Serial.print("\t");
+        }
+        else
+        {
+          //we're close from setpoint
+          myPID.SetTunings(aggKp, aggKi, aggKd);
+          Serial.print("PID Mode: HOLD"); 
+          Serial.print("\t");
+          
+        }
+
+        myPID.Compute();
+        throttle = Output;
+        
+        Serial.print("\t");
+        Serial.print("Target Error: ");
+        Serial.println(Setpoint - rpm);
+        //Error Test
+        if (throttle < 0.0 || throttle > 100.0) {
+          throttle = prev_throttle;
+          microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0)) + 0.50); //round to int
+          m1.writeMicroseconds(microseconds); // Motor will power down to 0%
+        }
+
+        microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0)) + 0.50); //round to int
+        m1.writeMicroseconds(microseconds); // Will write to new throttle
+        delay(100);
+
+
+        if (Serial.available() > 0) { // SERIAL EVENT
+          myPID.SetMode(MANUAL);  //turn the PID off
+          break;
+        }
+      }
     }
     else { //THROTTLE EVENT
       if (strcmp(inData, "0")  == 0) {
@@ -139,7 +207,7 @@ void loop() {
 
     } // END THROTTLE EVENT
 
-
+    //clear inData buffer
     for (int i = 0; i < 19; i++) {
       inData[i] = 0;
     }
@@ -150,7 +218,7 @@ void loop() {
   } // END OF SERIAL EVENT
 
 
-
+  //////////////////////////// READ RPM /////////////////////////////
   if (throttle > 9) {
     rpm = getrpm(b, rpm); //pass the last rpm
   }
@@ -158,14 +226,16 @@ void loop() {
     rpm = 0.00;
 
     Serial.print(0.00); //rps
-    Serial.print("  ");
+    Serial.print("\t");
 
     analogWrite(rpsout, 0); //send pwm data to labjack
   }
-  Serial.print("  ");
+  Serial.print("\t");
   Serial.println(rpm);
 }
 
+
+//////////////////////////// FUNCTIONS /////////////////////////////
 float getrpm( int b, float rpmlast ) {
 
   unsigned long time1 = 0;
@@ -180,8 +250,6 @@ float getrpm( int b, float rpmlast ) {
   int lastpropState = 0;
 
 
-
-  /* RPM Indicator */
   //wait for a prop to pass
 
   while (digitalRead(signal) == LOW)
@@ -231,7 +299,7 @@ float getrpm( int b, float rpmlast ) {
   rps = 1 / ((elapsedtime) / 1000000.00);
 
   Serial.print(rps);
-  Serial.print("  ");
+  Serial.print("\t");
 
   analogWrite(rpsout, int((rps * 1.8) + 0.5)); //send pwm data to labjack
 
@@ -259,4 +327,10 @@ float getrpm( int b, float rpmlast ) {
 float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+void clearbuffer() {
+  while (Serial.available() > 0) {
+    remainingByte = (Serial.read()); //clear remaining values
+  }
 }
