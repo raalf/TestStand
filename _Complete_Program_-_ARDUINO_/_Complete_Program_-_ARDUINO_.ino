@@ -1,6 +1,9 @@
 /* COMPLETE PROGRAM - Motor Control and RPM Indicator */
 // v1.10 disable aggressive pid mode for KDE esc and motor
 // v1.15 adjust rpm smoothing mode (almost zero smoothing) to test rpm sensor spikes
+// v1.20 
+// v1.21 PID gain consKp = 0.003, consKi = 0.018, consKd = 0.001 (comment: cannot reach steady state, osscilation)
+// v1.22 consKp = 0.004, consKi = 0.015, consKd = 0.0001; //v1.22 
 
 #include <Servo.h>
 #include <PID_v1.h>
@@ -25,7 +28,10 @@ double Setpoint, Input, Output;
 //Define the aggressive and conservative Tuning Parameters
 //0.03
 double aggKp = 0.004, aggKi = 0.02, aggKd = 0.01 ; //close to target
-double consKp = 0.004, consKi = 0.01, consKd = 0.00; //far away from target
+//double consKp = 0.004, consKi = 0.01, consKd = 0.00; //far away from target
+//double consKp = 0.003, consKi = 0.018, consKd = 0.001;//v1,21
+
+double consKp = 0.004, consKi = 0.015, consKd = 0.0001; //v1.22 
 int PIDon = 0; //PID on off
 int pidinit = 0; //PID init loop
 //Specify the links and initial tuning parameters
