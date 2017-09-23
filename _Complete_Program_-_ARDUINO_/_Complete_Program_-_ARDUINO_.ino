@@ -351,7 +351,7 @@ float getrpm( int b, float rpmlast ) {
     //find revs per second
     rps = 1 / ((elapsedtime) / 1000000.00);
 
-    rpmnew[num_read]  = rps * 60;
+    rpmnew[i]  = rps * 60;
 
     //Serial.print(rpmnew);
     //Serial.print(" ");
