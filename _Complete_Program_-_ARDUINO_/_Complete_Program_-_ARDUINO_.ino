@@ -351,16 +351,16 @@ float getrpm( int b, float rpmlast ) {
     //find revs per second
     rps = 1 / ((elapsedtime) / 1000000.00);
 
-    Serial.print(rps);
-    Serial.print("\t");
-
-    analogWrite(rpsout, int((rps * 1.8) + 0.5)); //send pwm data to labjack
-
     rpmnew[num_read]  = rps * 60;
 
     //Serial.print(rpmnew);
     //Serial.print(" ");
   }
+
+    Serial.print(rps);
+    Serial.print("\t");
+
+    analogWrite(rpsout, int((rps * 1.8) + 0.5)); //send pwm data to labjack
     //smoothing equation rpm = (rpmlast*alpha) + (rpmnew *(1-alpha))
 
     //rpm = (rpmlast * 0.75) + (rpmnew * 0.25);
