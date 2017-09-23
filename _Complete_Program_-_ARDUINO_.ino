@@ -39,8 +39,8 @@ void setup() {
   Serial.println("| LABORATORY OF |       | Hold Current RPM: Enter h                      |");
   Serial.println("| FLIGHT        |       | Hold Specific RPM: Enter h #### (1000 - 9000)  |");
   Serial.println("+---------------+       +------------------------------------------------+\n");
-  
-  
+
+
   Serial.println("Warning: Do not connect power supply.");
   pinMode(signal, INPUT); //RPM Sensor pin
   pinMode(rpsout, OUTPUT);   // sets the pin as output
@@ -145,7 +145,7 @@ void loop() {
           PIDon = 0;
         }
       }
-      if (PIDon == 1 && rpm > 0) {        
+      if (PIDon == 1 && rpm > 0) {
         Output = throttle; //trying to get the pid to not start at 0% throttle
         myPID.SetMode(AUTOMATIC);  //turn the PID on
 
@@ -290,85 +290,123 @@ float getrpm( int b, float rpmlast ) {
   unsigned long elapsedtime = 0;
   float rps = 0;
   //float rpm = 0;
-  float rpmnew = 0;
+  int num_read = 4; //must be greater than 3
+  float rpmnew[num_read];
   //float rpmlast = 0;
   int count = 0;
+
   int propState = 0;
   int lastpropState = 0;
 
+  for (int i = 0; i < num_read; i++) {
 
-  //wait for a prop to pass
 
-  while (digitalRead(signal) == LOW)
-  {
-    //do nothing
-  }
-  while (digitalRead(signal) == HIGH)
-  {
-    //do nothing
-  }
+    //wait for a prop to pass
 
-  count = 0;
-
-  //count up to number of blades
-  while (count < b + 1)
-  {
-
-    //if state has chaged...
-    propState = digitalRead(signal);
-    if (propState != lastpropState)
+    while (digitalRead(signal) == LOW)
     {
-      //if a prop is in the way
-      if (propState == LOW)
-      {
-        if (count == 0) //if this is the opening pass, start timing
-        {
-          time1 = micros();
-        }
-        count++; //increase the count
-        delay(2); //small delay necessary to remove debouncing
-        //delayMicroseconds(500);
-      }
+      //do nothing
     }
-    lastpropState = propState;
+    while (digitalRead(signal) == HIGH)
+    {
+      //do nothing
+    }
+
+    count = 0;
+
+    //count up to number of blades
+    while (count < b + 1)
+    {
+
+      //if state has chaged...
+      propState = digitalRead(signal);
+      if (propState != lastpropState)
+      {
+        //if a prop is in the way
+        if (propState == LOW)
+        {
+          if (count == 0) //if this is the opening pass, start timing
+          {
+            time1 = micros();
+          }
+          count++; //increase the count
+          delay(2); //small delay necessary to remove debouncing
+          //delayMicroseconds(500);
+        }
+      }
+      lastpropState = propState;
+    }
+
+    //after one revolution (360 degrees) take the time
+    time2 = micros() - 2000; // (!NOTE!..we subtract out the delay which was added after the last count++)
+    //delay(50); //another small delay
+    elapsedtime = time2 - time1;//get elapsed time for 360 deg revolution
+
+
+    //Serial.print(elapsedtime);
+    //Serial.print(" ");
+
+    //find revs per second
+    rps = 1 / ((elapsedtime) / 1000000.00);
+
+    Serial.print(rps);
+    Serial.print("\t");
+
+    analogWrite(rpsout, int((rps * 1.8) + 0.5)); //send pwm data to labjack
+
+    rpmnew[num_read]  = rps * 60;
+
+    //Serial.print(rpmnew);
+    //Serial.print(" ");
   }
+    //smoothing equation rpm = (rpmlast*alpha) + (rpmnew *(1-alpha))
 
-  //after one revolution (360 degrees) take the time
-  time2 = micros() - 2000; // (!NOTE!..we subtract out the delay which was added after the last count++)
-  //delay(50); //another small delay
-  elapsedtime = time2 - time1;//get elapsed time for 360 deg revolution
+    //rpm = (rpmlast * 0.75) + (rpmnew * 0.25);
 
+    int maximum = getIndexOfMaxValue(rpmnew, num_read);
 
-  //Serial.print(elapsedtime);
-  //Serial.print(" ");
+    int minimum = getIndexOfMinValue(rpmnew, num_read);
 
-  //find revs per second
-  rps = 1 / ((elapsedtime) / 1000000.00);
+    rpm = (array_sum(rpmnew, num_read) - rpmnew[maximum] - rpmnew[minimum]) / (num_read - 2);
+    //Serial.println(rpm);
 
-  Serial.print(rps);
-  Serial.print("\t");
+    //elapsedtime = 0;
+    //time1 = 0;
+    //time2 = 0;
 
-  analogWrite(rpsout, int((rps * 1.8) + 0.5)); //send pwm data to labjack
-
-  rpmnew = rps * 60;
-
-  //Serial.print(rpmnew);
-  //Serial.print(" ");
-
-  //smoothing equation rpm = (rpmlast*alpha) + (rpmnew *(1-alpha))
-
-  rpm = (rpmlast * 0.75) + (rpmnew * 0.25);
-
-
-
-  //Serial.println(rpm);
-
-  //elapsedtime = 0;
-  //time1 = 0;
-  //time2 = 0;
+ 
 
   //return rpmnew;
   return rpm;
+}
+
+int getIndexOfMaxValue(float* array, int size) {
+  int maxIndex = 0;
+  int max = array[maxIndex];
+  for (int i = 1; i < size; i++) {
+    if (max < array[i]) {
+      max = array[i];
+      maxIndex = i;
+    }
+  }
+}
+
+int getIndexOfMinValue(float* array, int size) {
+  int minIndex = 0;
+  int min = array[minIndex];
+  for (int i = 1; i < size; i++) {
+    if (min > array[i]) {
+      min = array[i];
+      minIndex = i;
+    }
+  }
+}
+
+float array_sum(float * array, int size) {
+  float sum = 0;
+  for (int i = 1; i < size; i++) {
+    sum = sum + array[i];
+  }
 }
 
 float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
