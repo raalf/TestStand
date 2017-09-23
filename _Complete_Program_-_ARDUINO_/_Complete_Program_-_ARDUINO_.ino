@@ -384,31 +384,34 @@ float getrpm( int b, float rpmlast ) {
 
 int getIndexOfMaxValue(float* array, int size) {
   int maxIndex = 0;
-  int max = array[maxIndex];
+  int maxv = array[maxIndex];
   for (int i = 1; i < size; i++) {
-    if (max < array[i]) {
-      max = array[i];
+    if (maxv < array[i]) {
+      maxv = array[i];
       maxIndex = i;
     }
   }
+  return maxIndex;
 }
 
 int getIndexOfMinValue(float* array, int size) {
   int minIndex = 0;
-  int min = array[minIndex];
+  int minv = array[minIndex];
   for (int i = 1; i < size; i++) {
-    if (min > array[i]) {
-      min = array[i];
+    if (minv > array[i]) {
+      minv = array[i];
       minIndex = i;
     }
   }
+  return minIndex;
 }
 
-float array_sum(float * array, int size) {
+float array_sum(float* array, int size) {
   float sum = 0;
   for (int i = 0; i < size; i++) {
     sum = sum + array[i];
   }
+  return sum;
 }
 
 float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
