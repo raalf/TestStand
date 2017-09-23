@@ -1,4 +1,6 @@
 /* COMPLETE PROGRAM - Motor Control and RPM Indicator */
+// v1.10 disable aggressive pid mode for KDE esc and motor
+// v1.15 adjust rpm smoothing mode (almost zero smoothing) to test rpm sensor spikes
 
 #include <Servo.h>
 #include <PID_v1.h>
@@ -168,20 +170,20 @@ void loop() {
 
           double gap = abs(Setpoint - Input); //distance away from setpoint
 
-          if (gap > 100)
-          { //we're far to setpoint
+//          if (gap > 100)
+//          { //we're far to setpoint
             myPID.SetTunings(consKp, consKi, consKd);
             Serial.print("PID GOTO ") ;
             Serial.print(Setpoint) ;
-          }
-          else
-          {
-            //we're close from setpoint
-            myPID.SetTunings(aggKp, aggKi, aggKd);
-            Serial.print("PID HOLD ");
-            Serial.print(Setpoint) ;
-
-          }
+//          }
+//          else
+//          {
+//            //we're close from setpoint
+//            myPID.SetTunings(aggKp, aggKi, aggKd);
+//            Serial.print("PID HOLD ");
+//            Serial.print(Setpoint) ;
+//
+//          }
 
           myPID.Compute();
           if (pidinit != 0) { //this will ignore the very first pid loop (to deal with output starting at 0)
@@ -357,8 +359,8 @@ float getrpm( int b, float rpmlast ) {
 
   //smoothing equation rpm = (rpmlast*alpha) + (rpmnew *(1-alpha))
 
-  rpm = (rpmlast * 0.75) + (rpmnew * 0.25);
-
+  //rpm = (rpmlast * 0.75) + (rpmnew * 0.25);
+  rpm = (rpmlast * 0.10) + (rpmnew * 0.90);
 
 
   //Serial.println(rpm);
