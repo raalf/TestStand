@@ -406,7 +406,7 @@ int getIndexOfMinValue(float* array, int size) {
 
 float array_sum(float * array, int size) {
   float sum = 0;
-  for (int i = 1; i < size; i++) {
+  for (int i = 0; i < size; i++) {
     sum = sum + array[i];
   }
 }
