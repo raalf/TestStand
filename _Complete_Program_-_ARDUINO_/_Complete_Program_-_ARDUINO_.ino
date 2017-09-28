@@ -289,11 +289,11 @@ void loop() {
             break;
           }
 
-          if (rpm ==0){
+          if (rpm == 0) {
 
             break;
           }
-          
+
         } //end of ramp
 
         if (RAMPon == 1) {
@@ -414,7 +414,7 @@ float getrpm( int b, float rpmlast ) {
     while (digitalRead(signal) == HIGH)
     {
       //do nothing
-      if (millis() - time3 > 500) {        
+      if (millis() - time3 > 500) {
         rpstimeout == 1;
         break;
       }
@@ -443,7 +443,7 @@ float getrpm( int b, float rpmlast ) {
         }
       }
       lastpropState = propState;
-      if (micros() - time1 > 500000) { //timeout       
+      if (micros() - time1 > 5000000) { //timeout
         rpstimeout == 1;
         break;
       }
