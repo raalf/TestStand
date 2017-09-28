@@ -234,14 +234,14 @@ void loop() {
       if (withoutR.toFloat() != 0) { // withoutR IS valid float
         if (withoutR.toFloat() >= 0.0 && withoutR.toFloat() <= 100.0) { // check if entered throttle is 0<r<100
           //RAMP
-          Setpoint = String(withoutR).toFloat(); // set the throttle
+          Setpoint = float((withoutR).toFloat()); // set the throttle
           RAMPon = 1;
         }
         else {
           RAMPon = 0;
         }
       }
-      else { // entered rpm is out of range
+      else { // entered throttle is out of range
         RAMPon = 0;
       }
       if (RAMPon == 1 && rpm > 0) {
@@ -278,19 +278,19 @@ void loop() {
           microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0)) + 0.50); //round to int
           m1.writeMicroseconds(microseconds); // Will write to new throttle
 
-          if ((500 - millis() - ramptimer) > 100.0)
-            delay(500 - millis() - ramptimer);
+          if ((500 - (millis() - ramptimer)) > 100.0)
+            delay(500 - (millis() - ramptimer));
           else {
             delay(100);
           }
 
           if (Serial.available() > 0) { // SERIAL EVENT
-            RAMPon == 0; //stop ramping
+            RAMPon = 0; //stop ramping
             break;
           }
 
           if (rpm == 0) {
-
+            
             break;
           }
 
