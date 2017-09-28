@@ -400,13 +400,14 @@ float getrpm( int b, float rpmlast ) {
 
 
     //wait for a prop to pass
-    rpstimeout == 0;
+    rpstimeout = 0;
     time3 = millis();
     while (digitalRead(signal) == LOW)
     {
       //do nothing
-      if (millis() - time3 > 500) {
+      if (millis() - time3 > 300) {
         rpstimeout = 1;
+        
         break;
       }
     }
@@ -414,14 +415,15 @@ float getrpm( int b, float rpmlast ) {
     while (digitalRead(signal) == HIGH)
     {
       //do nothing
-      if (millis() - time3 > 500) {
+      if (millis() - time3 > 300) {
         rpstimeout = 1;
+        
         break;
       }
     }
 
     count = 0;
-
+    time3 = millis();
     //count up to number of blades
     while (count < b + 1)
     {
@@ -443,8 +445,9 @@ float getrpm( int b, float rpmlast ) {
         }
       }
       lastpropState = propState;
-      if (micros() - time1 > 500000) { //timeout
+      if ((millis() - time3) > 300) { //timeout
         rpstimeout = 1;
+        
         break;
       }
     }
@@ -457,7 +460,7 @@ float getrpm( int b, float rpmlast ) {
 
     //Serial.print(elapsedtime);
     //Serial.print(" ");
-
+    
     //find revs per second
     if (rpstimeout == 0) {
       rps = 1 / ((elapsedtime) / 1000000.00);
