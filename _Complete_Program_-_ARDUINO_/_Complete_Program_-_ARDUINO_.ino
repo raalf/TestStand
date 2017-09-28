@@ -1,9 +1,9 @@
 /* COMPLETE PROGRAM - Motor Control and RPM Indicator */
 // v1.10 disable aggressive pid mode for KDE esc and motor
 // v1.15 adjust rpm smoothing mode (almost zero smoothing) to test rpm sensor spikes
-// v1.20 
+// v1.20
 // v1.21 PID gain consKp = 0.003, consKi = 0.018, consKd = 0.001 (comment: cannot reach steady state, osscilation)
-// v1.22 consKp = 0.004, consKi = 0.015, consKd = 0.0001; //v1.22 
+// v1.22 consKp = 0.004, consKi = 0.015, consKd = 0.0001; //v1.22
 
 #include <Servo.h>
 #include <PID_v1.h>
@@ -23,6 +23,10 @@ uchar signal = 4; //RPM Sensor on pin 4
 uchar rpsout = 11; //Data out to labjack
 uchar throut = 3; //Data out to labjack
 
+//RAMP variables
+int RAMPon = 0; //PID on off
+float ramptimer = 0;
+
 //Define PID Variables we'll be connecting to
 double Setpoint, Input, Output;
 //Define the aggressive and conservative Tuning Parameters
@@ -31,7 +35,7 @@ double aggKp = 0.004, aggKi = 0.02, aggKd = 0.01 ; //close to target
 //double consKp = 0.004, consKi = 0.01, consKd = 0.00; //far away from target
 //double consKp = 0.003, consKi = 0.018, consKd = 0.001;//v1,21
 
-double consKp = 0.004, consKi = 0.015, consKd = 0.0001; //v1.22 
+double consKp = 0.004, consKi = 0.015, consKd = 0.0001; //v1.22
 int PIDon = 0; //PID on off
 int pidinit = 0; //PID init loop
 //Specify the links and initial tuning parameters
@@ -131,7 +135,7 @@ void loop() {
       PIDon = 0; // PID is on only in specific cases
       // check if without H contains valid float
       if (withoutH.toFloat() != 0) { // withoutH IS valid float
-        if (withoutH.toFloat() > 1000 && withoutH.toFloat() < 9000) { // check if entered rpm is > 1000 & < 9000
+        if (withoutH.toFloat() >= 800 && withoutH.toFloat() <= 9000) { // check if entered rpm is > 1000 & < 9000
           Setpoint = int(withoutH.toFloat() + 0.5); // set the rpm
           PIDon = 1;
         }
@@ -176,20 +180,20 @@ void loop() {
 
           double gap = abs(Setpoint - Input); //distance away from setpoint
 
-//          if (gap > 100)
-//          { //we're far to setpoint
-            myPID.SetTunings(consKp, consKi, consKd);
-            Serial.print("PID GOTO ") ;
-            Serial.print(Setpoint) ;
-//          }
-//          else
-//          {
-//            //we're close from setpoint
-//            myPID.SetTunings(aggKp, aggKi, aggKd);
-//            Serial.print("PID HOLD ");
-//            Serial.print(Setpoint) ;
-//
-//          }
+          //          if (gap > 100)
+          //          { //we're far to setpoint
+          myPID.SetTunings(consKp, consKi, consKd);
+          Serial.print("PID GOTO ") ;
+          Serial.print(Setpoint) ;
+          //          }
+          //          else
+          //          {
+          //            //we're close from setpoint
+          //            myPID.SetTunings(aggKp, aggKi, aggKd);
+          //            Serial.print("PID HOLD ");
+          //            Serial.print(Setpoint) ;
+          //
+          //          }
 
           myPID.Compute();
           if (pidinit != 0) { //this will ignore the very first pid loop (to deal with output starting at 0)
@@ -221,6 +225,87 @@ void loop() {
         }
       }
     }
+
+    else if (inData[0] == 'r') { //RAMP EVENT
+      String withoutR = String(inData);
+      withoutR.remove(0, 1);
+      RAMPon = 0; // ramp is on only in specific cases
+      // check if withoutR contains valid float
+      if (withoutR.toFloat() != 0) { // withoutR IS valid float
+        if (withoutR.toFloat() >= 0.0 && withoutR.toFloat() <= 100.0) { // check if entered throttle is 0<r<100
+          //RAMP
+          Setpoint = String(withoutR).toFloat(); // set the throttle
+          RAMPon = 1;
+        }
+        else {
+          RAMPon = 0;
+        }
+      }
+      else { // entered rpm is out of range
+        RAMPon = 0;
+      }
+      if (RAMPon == 1 && rpm > 0) {
+        while (abs(Setpoint - prev_throttle) > 1.0) {
+          ramptimer = millis();
+          Serial.print(millis());
+          Serial.print("\t");
+
+          Serial.print(throttle); // Only read with a serial input given
+          Serial.print("\t");
+          analogWrite(throut, int(throttle * 2.54) + 0.5); //send throttle data to labjack
+
+          rpm = getrpm(b, rpm); //pass the last rpm
+          Serial.print(rpm);
+          Serial.print("\t");
+
+
+
+          prev_throttle = throttle; // store throttle setting from prev. instance
+          if ((Setpoint - prev_throttle) > 0) {
+            throttle = prev_throttle + 1;
+          }
+          else if ((Setpoint - prev_throttle) < 0) {
+            throttle = prev_throttle - 1;
+          }
+
+          Serial.print("RAMP TO ") ;
+          Serial.print(Setpoint) ;
+
+          Serial.print("\t");
+          Serial.print("(");
+          Serial.print(Setpoint - throttle);
+          Serial.println(")");
+          microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0)) + 0.50); //round to int
+          m1.writeMicroseconds(microseconds); // Will write to new throttle
+
+          if ((500 - millis() - ramptimer) > 100.0)
+            delay(500 - millis() - ramptimer);
+          else {
+            delay(100);
+          }
+
+          if (Serial.available() > 0) { // SERIAL EVENT
+            RAMPon == 0; //stop ramping
+            break;
+          }
+
+          if (rpm ==0){
+
+            break;
+          }
+          
+        } //end of ramp
+
+        if (RAMPon == 1) {
+          throttle = Setpoint; //set throttle to exact value
+          microseconds = int((mapfloat(throttle, 0.0, 100.0, 1092.0, 1904.0)) + 0.50); //round to int
+          m1.writeMicroseconds(microseconds); // Will write to new throttle
+          delay(100);
+        }
+
+      }
+    }
+
 
     else { //THROTTLE EVENT
       if (strcmp(inData, "0")  == 0) {
@@ -273,7 +358,7 @@ void loop() {
 
 
   //////////////////////////// READ RPM /////////////////////////////
-  if (throttle > 9) {
+  if (throttle >= 0) {
     rpm = getrpm(b, rpm); //pass the last rpm
   }
   else {
@@ -296,7 +381,12 @@ float getrpm( int b, float rpmlast ) {
   unsigned long time1 = 0;
   unsigned long time2 = 0;
   unsigned long elapsedtime = 0;
+
+  unsigned long time3 = 0;
+
+
   float rps = 0;
+  int rpstimeout = 0;
   //float rpm = 0;
   int num_read = 4; //must be greater than 3
   float rpmnew[num_read];
@@ -310,14 +400,24 @@ float getrpm( int b, float rpmlast ) {
 
 
     //wait for a prop to pass
-
+    rpstimeout == 0;
     while (digitalRead(signal) == LOW)
     {
       //do nothing
+      time3 = millis();
+      if (time3 > 500) {
+        rpstimeout == 1;
+        break;
+      }
     }
     while (digitalRead(signal) == HIGH)
     {
       //do nothing
+      time3 = millis();
+      if (time3 > 500) {        
+        rpstimeout == 1;
+        break;
+      }
     }
 
     count = 0;
@@ -343,6 +443,10 @@ float getrpm( int b, float rpmlast ) {
         }
       }
       lastpropState = propState;
+      if (time1 > 500000) { //timeout       
+        rpstimeout == 1;
+        break;
+      }
     }
 
     //after one revolution (360 degrees) take the time
@@ -355,7 +459,13 @@ float getrpm( int b, float rpmlast ) {
     //Serial.print(" ");
 
     //find revs per second
-    rps = 1 / ((elapsedtime) / 1000000.00);
+    if (rpstimeout == 0) {
+      rps = 1 / ((elapsedtime) / 1000000.00);
+    }
+    else {
+      rps = 0;
+
+    }
 
     rpmnew[i]  = rps * 60;
 
@@ -363,32 +473,32 @@ float getrpm( int b, float rpmlast ) {
     //Serial.print(" ");
   }
 
-    Serial.print(rps);
-    Serial.print("\t");
+  Serial.print(rps);
+  Serial.print("\t");
 
-    analogWrite(rpsout, int((rps * 1.8) + 0.5)); //send pwm data to labjack
-    //smoothing equation rpm = (rpmlast*alpha) + (rpmnew *(1-alpha))
+  analogWrite(rpsout, int((rps * 1.8) + 0.5)); //send pwm data to labjack
+  //smoothing equation rpm = (rpmlast*alpha) + (rpmnew *(1-alpha))
 
-    //rpm = (rpmlast * 0.75) + (rpmnew * 0.25);
+  //rpm = (rpmlast * 0.75) + (rpmnew * 0.25);
 
-    int maximum = getIndexOfMaxValue(rpmnew, num_read);
+  int maximum = getIndexOfMaxValue(rpmnew, num_read);
 
-    int minimum = getIndexOfMinValue(rpmnew, num_read);
+  int minimum = getIndexOfMinValue(rpmnew, num_read);
 
-    rpm = (array_sum(rpmnew, num_read) - rpmnew[maximum] - rpmnew[minimum]) / (num_read - 2);
-    //Serial.println(rpm);
+  rpm = (array_sum(rpmnew, num_read) - rpmnew[maximum] - rpmnew[minimum]) / (num_read - 2);
+  //Serial.println(rpm);
 
-    //elapsedtime = 0;
-    //time1 = 0;
-    //time2 = 0;
+  //elapsedtime = 0;
+  //time1 = 0;
+  //time2 = 0;
 
- 
+
 
   //return rpmnew;
   return rpm;
 }
 
-int getIndexOfMaxValue(float* array, int size) {
+int getIndexOfMaxValue(float * array, int size) {
   int maxIndex = 0;
   int maxv = array[maxIndex];
   for (int i = 1; i < size; i++) {
@@ -400,7 +510,7 @@ int getIndexOfMaxValue(float* array, int size) {
   return maxIndex;
 }
 
-int getIndexOfMinValue(float* array, int size) {
+int getIndexOfMinValue(float * array, int size) {
   int minIndex = 0;
   int minv = array[minIndex];
   for (int i = 1; i < size; i++) {
@@ -412,7 +522,7 @@ int getIndexOfMinValue(float* array, int size) {
   return minIndex;
 }
 
-float array_sum(float* array, int size) {
+float array_sum(float * array, int size) {
   float sum = 0;
   for (int i = 0; i < size; i++) {
     sum = sum + array[i];
