@@ -401,20 +401,20 @@ float getrpm( int b, float rpmlast ) {
 
     //wait for a prop to pass
     rpstimeout == 0;
+    time3 = millis();
     while (digitalRead(signal) == LOW)
     {
       //do nothing
-      time3 = millis();
-      if (time3 > 500) {
+      if (millis() - time3 > 500) {
         rpstimeout == 1;
         break;
       }
     }
+    time3 = millis();
     while (digitalRead(signal) == HIGH)
     {
       //do nothing
-      time3 = millis();
-      if (time3 > 500) {        
+      if (millis() - time3 > 500) {        
         rpstimeout == 1;
         break;
       }
@@ -443,7 +443,7 @@ float getrpm( int b, float rpmlast ) {
         }
       }
       lastpropState = propState;
-      if (time1 > 500000) { //timeout       
+      if (micros() - time1 > 500000) { //timeout       
         rpstimeout == 1;
         break;
       }
