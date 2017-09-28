@@ -406,7 +406,7 @@ float getrpm( int b, float rpmlast ) {
     {
       //do nothing
       if (millis() - time3 > 500) {
-        rpstimeout == 1;
+        rpstimeout = 1;
         break;
       }
     }
@@ -415,7 +415,7 @@ float getrpm( int b, float rpmlast ) {
     {
       //do nothing
       if (millis() - time3 > 500) {
-        rpstimeout == 1;
+        rpstimeout = 1;
         break;
       }
     }
@@ -443,8 +443,8 @@ float getrpm( int b, float rpmlast ) {
         }
       }
       lastpropState = propState;
-      if (micros() - time1 > 5000000) { //timeout
-        rpstimeout == 1;
+      if (micros() - time1 > 500000) { //timeout
+        rpstimeout = 1;
         break;
       }
     }
